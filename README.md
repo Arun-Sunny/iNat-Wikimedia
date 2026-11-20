@@ -10,6 +10,79 @@ It is a static site: plain HTML, CSS and JavaScript with no server, no build ste
 
 The app has a built-in **Help** page (the **?** button) with these instructions, including how to set up the Wikimedia login.
 
+## Quick guide for photographers
+
+You don't need any technical knowledge. Allow about 15 minutes the first time.
+
+### What you need before you start
+1. **A Wikimedia account** (free). Create one at <https://commons.wikimedia.org/wiki/Special:CreateAccount>. Remember the username and password: you type them on Wikimedia's own page, never in this app.
+2. **Your iNaturalist photos set to an open license.** Commons only accepts **CC0**, **CC BY** or **CC BY-SA**. The iNaturalist default, "CC BY-NC", is **not** accepted, and those photos show as "can't upload" in the app. To change it, sign in to iNaturalist, open **Account settings** and choose a license for your photos.
+3. **The link to your iNaturalist profile**, for example `https://www.inaturalist.org/people/yourname`. Open your profile on iNaturalist and copy the address from the top of the browser.
+
+### Uploading, step by step
+1. **Open the app:** <https://arun-sunny.github.io/iNat-Wikimedia/> (works on a phone or a computer).
+2. **Log in:** press **Log in with Wikimedia** at the top right. Wikimedia's own page opens. Type your Wikimedia username and password there, then press **Allow**. You come back to the app and see your name at the top right.
+3. **Step 1, Load photos:** paste your iNaturalist profile link in the box and press **Use this account**. Tick **These are my own photos** if you took them yourself. Then press **Load photos** and wait about a minute while your photos load.
+4. **Step 2, Choose photos:** tap a photo to select it (a green tick appears). Greyed-out photos can't be uploaded; the small label says why. To pick many at once, press **Add best photo of each species**.
+5. **Step 3, Review and upload:**
+   1. Press **Check & preview**. The app checks that Commons doesn't already have your photo and shows the file name and the description that will appear on Commons.
+   2. Press **Upload**. The photos are sent one at a time with a short pause between them. Don't close the page until it says it's finished.
+6. **Look at your photos on Commons:** each uploaded photo has a link next to it. Check that the page looks right.
+
+**Start small.** Upload 2 or 3 photos first and look at them on Commons. Then upload more. By default each run uploads at most 5 photos; you can change this in **Settings** (the gear icon) under **Pace**.
+
+### Uploading to a contest or project (for example Wiki Loves Birds India 2026)
+Contests ask for their own category and sometimes a special label on each photo. Open **Settings → Categories and review** and fill in the boxes. Here is a complete example for **Wiki Loves Birds India 2026**:
+
+| Box in Settings | What to type |
+| --- | --- |
+| Category when the species has none on Commons | Leave it as it is. |
+| Project or campaign categories | Type these three lines, one per line (see "The subject" below):<br>`Images from Wiki Loves Birds India 2026`<br>`Images from Wiki Loves Birds India 2026 (maintenance)`<br>`Images from Wiki Loves Birds India 2026 (Bird portraits)` |
+| Campaign template for the file page | `{{Wiki loves Birds India event\|2026}}` |
+| Hashtag for the edit summary | Leave it empty. |
+
+Press **Save**, and make sure **These are my own photos** is ticked in step 1: this contest only accepts photos you took yourself.
+
+**The subject.** The contest asks you to pick one subject per photo. The last category line is the subject. Replace `Bird portraits` with the subject of the photos you are uploading:
+- Wiki Loves Birds - Assam
+- Bird portraits
+- Birds in flight
+- Habitat and environment
+- Behavior and action
+- Conservation and human impact
+- Rare or Endangered or Special sightings
+- Others
+
+Select only photos that share that subject, upload them, then change that line to the next subject and upload the next group.
+
+**Check the contest rules** on the contest's own page (for Wiki Loves Birds India 2026: <https://commons.wikimedia.org/wiki/Commons:Wiki_Loves_Birds_India_2026>). Rules such as the dates the photos must be taken are not checked by this app.
+
+For another contest, open its `Campaign:` page on Commons (for example `Campaign:wlb_2026`). The `categories` lines under "defaults" and "autoAdd" are what to type in the categories box, and `wikitext` under "autoAdd" is the template.
+
+### If something goes wrong
+| What you see | What to do |
+| --- | --- |
+| "Log in" opens a Help page about setting up the login | The site's owner hasn't finished the one-time login setup yet. Ask the person who runs the site. |
+| You can log in, but the Upload button is greyed out with a message about permissions | The site's login is missing permissions. Tell the site's owner; they must set it up again with all four permissions. |
+| "You do not have permission to create new pages" | The same: the site's login is missing the "Create, edit, and move pages" permission. |
+| Only the person who set up the site can log in | Wikimedia has to approve the login setup first. This can take days or weeks. Ask the site's owner whether it's approved. |
+| A photo says "Already on Commons" | It was uploaded before. Nothing was done, which is correct. |
+| A photo says "File name already used" or "was deleted before" | Commons won't take it again. Skip it. |
+| "Commons asked for a CAPTCHA" | New Wikimedia accounts are sometimes asked to prove they're human, which this app can't show. Upload one photo by hand on commons.wikimedia.org, or wait until your account is a few days old and has 10 edits, then try again. |
+| "Your Wikimedia login is about to expire" | Press **Log in** again. A login lasts about 4 hours. |
+| The page is blank or looks old | Refresh it. On a computer press **Ctrl+F5**. |
+
+### Good to know
+- **Your photos stay yours.** You keep your copyright. The CC license lets anyone reuse the photo as long as they credit you.
+- **Location:** if your iNaturalist observation shows its exact location, it is put on the Commons page too. If you don't want an exact spot (for example your home) shown, change that observation's location privacy on iNaturalist first. "Obscured" or "private" locations are never sent.
+- **Linking your accounts (recommended):** add your Commons username to your iNaturalist profile text, and put a link to your iNaturalist profile on your Commons user page (`User:<your name>`). This helps Commons reviewers see that both accounts are yours.
+- **Uploading someone else's photos?** Leave **These are my own photos** unticked. They are then credited to the iNaturalist photographer and checked by Commons' license reviewers. Their iNaturalist license must still be CC0, CC BY or CC BY-SA.
+- **Hundreds of photos:** a new account sending thousands of files quickly can be flagged. Go in small batches and species by species. For very large uploads, ask first at the [Commons Village pump](https://commons.wikimedia.org/wiki/Commons:Village_pump) or [Commons:Batch uploading](https://commons.wikimedia.org/wiki/Commons:Batch_uploading).
+
+---
+
+## How it works (technical details)
+
 ## What it does
 
 1. **Load**: you paste your iNaturalist profile link (e.g. `https://www.inaturalist.org/people/yourname`) or type your username; the browser remembers it. The app then reads that account's observations from the public iNaturalist API, about one request per second. It pages with `id_above`, which avoids the API's 10,000-result cap. Data is cached in the browser, so later visits only fetch new observations.
@@ -59,26 +132,6 @@ The **These are my own photos** box in step 1 decides how the photos are describ
 - **Structured data:** depicts (P180), creator (P170: unknown value with the author name, plus the Wikimedia username for own work, and a URL), copyright license (P275), copyright status (P6216), source of file (P7482: "original creation by uploader" for own work, or "file available on the internet" at the iNaturalist photo page, operated by iNaturalist, for copies), inception (P571), and coordinates of the point of view (P1259) when public.
 
 Example wikitext is in [tests/golden/](tests/golden/).
-
----
-
-## Using the app (each photographer)
-
-1. **Have a Wikimedia account.** Create one at <https://commons.wikimedia.org/wiki/Special:CreateAccount> if needed. The same account works on all Wikimedia sites.
-2. **Make sure your iNaturalist photos have a Commons-compatible license**: CC0, CC BY or CC BY-SA. The iNaturalist default, CC BY-NC, can't go to Commons. You can change the license of past photos in your iNaturalist account settings.
-3. Open the app, paste your iNaturalist profile link, press **Use this account**, and tick **These are my own photos**.
-4. Press **Log in with Wikimedia**. You type your username and password on Wikimedia's own login page, never in this app. Wikimedia then asks you to allow the app to upload and edit for you. The login lasts about 4 hours and is forgotten when the tab closes.
-
-Recommended: link your two accounts, so Commons reviewers can see that the Commons account and the iNaturalist account belong to the same person.
-- On iNaturalist, add your Commons username to your profile bio.
-- On Commons, create your user page (`User:<your name>`) with a link to your iNaturalist profile.
-
-New accounts: Commons sometimes asks brand-new accounts for a CAPTCHA, which this app can't show. The upload then stops with an explanation. Upload one file by hand on Commons, or wait until the account is "autoconfirmed" (4 days and 10 edits).
-
-Bigger batches:
-- Start with a handful of photos and look at the resulting Commons pages before doing more.
-- A new account uploading thousands of files quickly can get flagged. Keep the delay between uploads (default 10 s) and go species by species.
-- For hundreds or thousands of uploads, consider posting at [Commons:Batch uploading](https://commons.wikimedia.org/wiki/Commons:Batch_uploading), or asking for a bot flag at [Commons:Bots/Requests](https://commons.wikimedia.org/wiki/Commons:Bots/Requests). Ask at the [Village pump](https://commons.wikimedia.org/wiki/Commons:Village_pump) if unsure.
 
 ---
 
