@@ -41,6 +41,7 @@ export const CONFIG = {
   requireTaxon: true,
   fallbackCategory: 'Media needing categories',
   extraCategory: '', // project/campaign categories, one per line or separated by ;
+  campaignWikitext: '', // template(s) added to every file page, one per line, e.g. {{Some campaign|2026}}
   editHashtag: '', // e.g. "#WLE2026", appended to every upload's edit summary
   includeLicenseReview: true,
   batchSize: 25, // photos checked per "Check & preview" run

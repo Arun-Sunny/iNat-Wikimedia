@@ -75,6 +75,7 @@ function defaultSettings() {
     fallbackCategory: CONFIG.fallbackCategory,
     extraCategory: CONFIG.extraCategory,
     editHashtag: CONFIG.editHashtag || '',
+    campaignWikitext: CONFIG.campaignWikitext || '',
     includeLicenseReview: CONFIG.includeLicenseReview,
     batchSize: CONFIG.batchSize,
     uploadLimit: CONFIG.uploadLimit,
@@ -581,6 +582,7 @@ function wikitextContext(info) {
     categories: [...new Set([info?.category, ...parseCategories(state.settings.extraCategory)].filter(Boolean))],
     includeLicenseReview: state.settings.includeLicenseReview,
     ownWork: Boolean(state.settings.ownWork),
+    extraWikitext: state.settings.campaignWikitext,
   };
 }
 

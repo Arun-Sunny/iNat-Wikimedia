@@ -31,9 +31,12 @@ The app has a built-in **Help** page (the **?** button) with these instructions,
 Uploads always go to Wikimedia Commons, the shared library behind Wikipedia, Wikispecies and the other Wikimedia projects. To file photos under a project, contest or WikiProject, open **Settings → Categories and review**:
 
 - **Project or campaign categories:** added to every photo, one per line or separated by `;`. Use the exact category the project asks for. The preview flags any that don't exist on Commons yet.
+- **Campaign template for the file page:** template(s) added to every file page, one per line, e.g. `{{Wiki loves Birds India event|2026}}`.
 - **Hashtag for the edit summary:** e.g. `#WLE2026`, appended to every upload's edit summary. Some campaigns use hashtags to find and count uploads.
 
-The species category is still chosen automatically. Campaigns that require a specific template on the file page aren't supported yet.
+The species category is still chosen automatically. A campaign's "subject" (for example "Bird portraits") is just another category: put the matching one in the categories box and change it between batches.
+
+To find what a campaign needs, open its `Campaign:` page on Commons (e.g. `Campaign:wlb_2026`): "defaults" and "autoAdd" list the categories and template, and "fields" lists the choices the upload form asks for.
 
 ## Own work or copied from iNaturalist
 

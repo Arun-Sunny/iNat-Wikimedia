@@ -87,6 +87,9 @@ export function renderWikitext(rec, ctx) {
   lines.push(`{{iNaturalist|${rec.obsId}}}`);
   lines.push('', '=={{int:license-header}}==', licenseLine);
   if (licenseReview) lines.push('{{iNaturalistreview}}');
+  // Campaign templates, e.g. {{Wiki loves Birds India event|2026}}: added as typed, one per line.
+  const extra = String(ctx.extraWikitext ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  if (extra.length) lines.push('', ...extra);
   lines.push('');
   for (const category of ctx.categories ?? []) lines.push(`[[Category:${category}]]`);
   return `${lines.join('\n')}\n`;

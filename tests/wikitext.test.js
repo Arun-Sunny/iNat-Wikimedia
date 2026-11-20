@@ -60,6 +60,16 @@ test('genus-level taxon, no date, no common name, CC0, no license review', () =>
   }));
 });
 
+test('campaign templates and project categories are added after the license, before categories', () => {
+  const [rec] = toPhotoRecords(sampleObservation());
+  const text = renderWikitext(rec, {
+    ...author,
+    categories: ['Saxicola maurus', 'Images from Example Campaign 2026', 'Images from Example Campaign 2026 (Bird portraits)'],
+    extraWikitext: '  {{Example campaign event|2026}}  \n\n',
+  });
+  assert.match(text, /\{\{iNaturalistreview\}\}\n\n\{\{Example campaign event\|2026\}\}\n\n\[\[Category:Saxicola maurus\]\]\n\[\[Category:Images from Example Campaign 2026\]\]\n\[\[Category:Images from Example Campaign 2026 \(Bird portraits\)\]\]\n$/);
+});
+
 test('transfer mode: copied from iNaturalist and credited to the photographer, always with license review', () => {
   const [rec] = toPhotoRecords(sampleObservation());
   golden('transfer-cc-by', renderWikitext(rec, {
