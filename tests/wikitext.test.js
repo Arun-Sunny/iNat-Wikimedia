@@ -60,6 +60,27 @@ test('genus-level taxon, no date, no common name, CC0, no license review', () =>
   }));
 });
 
+test('transfer mode: copied from iNaturalist and credited to the photographer, always with license review', () => {
+  const [rec] = toPhotoRecords(sampleObservation());
+  golden('transfer-cc-by', renderWikitext(rec, {
+    ...author,
+    commonsUser: 'Someone Else',
+    categories: ['Saxicola maurus'],
+    includeLicenseReview: false, // ignored: transfers always need review
+    ownWork: false,
+  }));
+});
+
+test('transfer mode with CC0 has no attribution parameter', () => {
+  const obs = sampleObservation();
+  obs.photos[0].license_code = 'cc0';
+  const [rec] = toPhotoRecords(obs);
+  const text = renderWikitext(rec, { ...author, categories: [], ownWork: false });
+  assert.match(text, /\n\{\{Cc-zero\}\}\n\{\{iNaturalistreview\}\}\n/);
+  assert.ok(!text.includes('{{own}}'));
+  assert.ok(!text.includes('{{self'));
+});
+
 test('family names are not italicised', () => {
   const [rec] = toPhotoRecords(sampleObservation({ taxon: { id: 7251, name: 'Muscicapidae', rank: 'family', preferred_common_name: 'Old World Flycatchers' } }));
   const text = renderWikitext(rec, { ...author, categories: [] });

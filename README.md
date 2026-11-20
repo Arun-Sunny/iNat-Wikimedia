@@ -8,7 +8,7 @@ It is a static site: plain HTML, CSS and JavaScript with no server, no build ste
 
 **Live site:** <https://arun-sunny.github.io/iNat-Wikimedia/>
 
-> **Status:** loading, choosing, duplicate checking and a full dry-run preview work. **Uploading is not switched on yet.** It comes in the next step, after the preview output has been reviewed.
+The app has a built-in **Help** page (the **?** button) with these instructions, including how to set up the Wikimedia login.
 
 ## What it does
 
@@ -20,10 +20,20 @@ It is a static site: plain HTML, CSS and JavaScript with no server, no build ste
    - checks whether the planned file name is already taken;
    - downloads the original photo and asks Commons whether a file with the same SHA-1 already exists;
    - shows the exact file name, description page wikitext and structured data that would be sent.
+4. **Upload**: after logging in with Wikimedia, uploads the selected photos one at a time, 5 per run by default with 10 seconds between files. For each photo it:
+   - downloads the original and checks Commons for an identical file again;
+   - uploads it with `action=upload`, sending `maxlag=5` and never `ignorewarnings`. If Commons warns that the file is a duplicate, was deleted before, or has a name already in use, the photo is skipped with the reason shown. If Commons suggests a corrected file name, the app retries once with it;
+   - adds the structured data to the new file with `wbeditentity`. If that fails, the upload stays, and **Add missing structured data** can retry it later;
+   - waits out "servers busy" (maxlag) and rate-limit replies, and stops on login problems, a CAPTCHA, or 3 failures in a row.
 
-Nothing is written to Commons in this version.
+## Own work or copied from iNaturalist
 
-## What an upload will look like
+The **These are my own photos** box in step 1 decides how the photos are described:
+
+- **Ticked:** the uploader took the photos. They're marked `{{own}}` and licensed with `{{self|cc-by-4.0}}`. The license review is optional (on by default in Settings).
+- **Unticked** (e.g. uploading a relative's or friend's photos): the photos are marked as copied from iNaturalist and credited to the iNaturalist photographer, with the license template carrying their attribution (`{{Cc-by-4.0|1=…}}`). `{{iNaturalistreview}}` is always added, because Commons requires a license review for files copied from iNaturalist.
+
+## What an upload looks like
 
 - **File name:** `Saxicola maurus (iNaturalist 123456789-987654321).jpg`
 - **Description page:**
@@ -34,7 +44,7 @@ Nothing is written to Commons in this version.
   - `{{self|cc-by-4.0}}`, or the matching CC0 / CC BY-SA template.
   - `{{iNaturalistreview}}`, which asks Commons' review bot to confirm the license on iNaturalist.
   - Categories.
-- **Structured data:** depicts (P180), creator (P170: unknown value with the author name, Wikimedia username and URL), copyright license (P275), copyright status (P6216), source of file (P7482: original creation by uploader), inception (P571), and coordinates of the point of view (P1259) when public.
+- **Structured data:** depicts (P180), creator (P170: unknown value with the author name, plus the Wikimedia username for own work, and a URL), copyright license (P275), copyright status (P6216), source of file (P7482: "original creation by uploader" for own work, or "file available on the internet" at the iNaturalist photo page, operated by iNaturalist, for copies), inception (P571), and coordinates of the point of view (P1259) when public.
 
 Example wikitext is in [tests/golden/](tests/golden/).
 
@@ -50,6 +60,8 @@ Example wikitext is in [tests/golden/](tests/golden/).
 Recommended: link your two accounts, so Commons reviewers can see that the Commons account and the iNaturalist account belong to the same person.
 - On iNaturalist, add your Commons username to your profile bio.
 - On Commons, create your user page (`User:<your name>`) with a link to your iNaturalist profile.
+
+New accounts: Commons sometimes asks brand-new accounts for a CAPTCHA, which this app can't show. The upload then stops with an explanation. Upload one file by hand on Commons, or wait until the account is "autoconfirmed" (4 days and 10 edits).
 
 Bigger batches:
 - Start with a handful of photos and look at the resulting Commons pages before doing more.
@@ -121,7 +133,7 @@ npm test
 UPDATE_GOLDEN=1 npm test   # rewrite tests/golden/*.wikitext after an intended change
 ```
 
-Covered: license mapping, file-name sanitising, wikitext rendering (golden files), structured data, iNaturalist paging (id_above, throttling, retries) and account parsing, eligibility rules, Commons and Wikidata lookups, and the OAuth/PKCE helpers.
+Covered: license mapping, file-name sanitising, wikitext rendering for own work and copies (golden files), structured data, iNaturalist paging (id_above, throttling, retries) and account parsing, eligibility rules, Commons and Wikidata lookups, the upload request format, upload warning handling, maxlag/rate-limit/token retries, and the OAuth/PKCE helpers.
 
 ### Configuration
 
@@ -138,7 +150,7 @@ Everything in that file is public. Never put a password or client secret there.
 ## Privacy and safety
 
 - No server: the login token goes straight from Wikimedia to the browser. It's kept in `sessionStorage`, never logged, and gone when the tab closes.
-- Only observations by the chosen iNaturalist account can be selected. Uploads are marked as the uploader's own work, so the app asks the user to confirm "These are my own photos". Changing the account clears that confirmation.
+- Only observations by the chosen iNaturalist account can be selected. Photos count as the uploader's own work only when "These are my own photos" is ticked; otherwise they're credited to the iNaturalist photographer. Changing the account unticks it.
 - Coordinates and place names are omitted for observations iNaturalist shows as obscured or private.
 - Open observations keep their exact public coordinates, as on iNaturalist. Change an observation's geoprivacy on iNaturalist first if a spot shouldn't be pinpointed, such as your home.
 - Duplicate check: a photo already on Commons (same bytes) is marked and can't be selected.
@@ -156,7 +168,8 @@ js/lib/license.js   iNaturalist license → Commons template and Wikidata item
 js/lib/filename.js  Commons file names
 js/lib/wikitext.js  description page
 js/lib/sdc.js       structured data
-js/lib/commons.js   Commons API reads (and, next step, uploads)
+js/lib/commons.js   Commons API client (reads, upload, wbeditentity)
+js/lib/uploader.js  one photo's upload: duplicate check, warnings, retries, structured data
 js/lib/wikidata.js  P3151 lookups
 js/lib/oauth.js     OAuth 2.0 + PKCE
 js/lib/cache.js     IndexedDB cache

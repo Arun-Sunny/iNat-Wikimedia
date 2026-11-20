@@ -1,5 +1,6 @@
-// UI for loading iNaturalist photos, choosing them, and previewing what would go to Commons.
-// This build never writes to Commons: no upload, no edit. Login only reads the user's name and rights.
+// UI for loading iNaturalist photos, choosing them, previewing what would go to Commons, and
+// uploading them. Writes to Commons happen only from "Upload" and "Add missing structured data",
+// one file at a time, with the user's own Wikimedia login.
 import { CONFIG } from './config.js';
 import { pageObservations, toPhotoRecords, parseInatUser, fetchUser, profileUrl } from './lib/inat.js';
 import { planRecord, pickOnePerSpecies, locationAllowed, SKIP_LABELS } from './lib/plan.js';
@@ -12,7 +13,8 @@ import { lookupTaxonQids } from './lib/wikidata.js';
 import { sha1Hex } from './lib/hash.js';
 import * as oauth from './lib/oauth.js';
 import * as cache from './lib/cache.js';
-import { escapeHtml, unique } from './lib/util.js';
+import { uploadPhoto, addStructuredData, isAuthError } from './lib/uploader.js';
+import { escapeHtml, unique, sleep } from './lib/util.js';
 
 const PAGE_SIZE = 60;
 const SETTINGS_KEY = 'i2c.settings';
@@ -91,7 +93,7 @@ const state = {
   auth: null,
   user: null,
   loadAbort: null,
-  previewAbort: null,
+  reviewAbort: null, // the running preview, upload or structured-data run in step 3
   reviewKeys: [],
   reviewInfo: new Map(),
   lastFetch: null,
@@ -145,7 +147,12 @@ function replan() {
 }
 
 const isEligible = (key) => state.plan.get(key)?.eligible === true;
-const onCommons = (key) => ['duplicate', 'uploaded', 'sdc_done'].includes(state.status.get(key)?.state);
+/** A photo's stored status for the current site (production or beta); older entries are production. */
+const statusFor = (key) => {
+  const s = state.status.get(key);
+  return s && (s.env ?? 'production') === envKey() ? s : null;
+};
+const onCommons = (key) => ['duplicate', 'uploaded', 'sdc_done'].includes(statusFor(key)?.state);
 const isSelectable = (key) => isEligible(key) && !onCommons(key);
 
 let saveSelectionTimer;
@@ -172,7 +179,7 @@ function errorMessage(e) {
 async function startLogin() {
   const id = clientId();
   if (!id) {
-    notify('Login isn\'t set up yet: the OAuth client ID is missing. Follow "Register the Wikimedia login" in the README, then put the ID in config.js or in Settings.', 'warn');
+    openHelp('helpLogin');
     return;
   }
   const verifier = oauth.randomString(48);
@@ -354,6 +361,9 @@ function renderLoad() {
   els.useAccountBtn.disabled = loading;
   els.ownWorkRow.hidden = !login;
   els.ownWorkCheck.checked = Boolean(state.settings.ownWork);
+  els.ownWorkHint.textContent = state.settings.ownWork
+    ? 'They will be uploaded as your own work.'
+    : `Leave unticked if you are uploading someone else's photos: they will be credited to ${creditName() || 'the iNaturalist photographer'} and marked as copied from iNaturalist, and Commons' license reviewers will check them.`;
 
   if (!login) {
     els.inatLine.textContent = 'Paste the link to your iNaturalist profile (or type your username), then press "Use this account".';
@@ -564,6 +574,7 @@ function wikitextContext(info) {
     commonsUser: state.user?.name ?? null,
     categories: [info?.category, state.settings.extraCategory].map((c) => (c || '').trim()).filter(Boolean),
     includeLicenseReview: state.settings.includeLicenseReview,
+    ownWork: Boolean(state.settings.ownWork),
   };
 }
 
@@ -573,28 +584,67 @@ function sdcContext(info) {
     authorUrl: creditUrl(),
     commonsUser: state.user?.name ?? null,
     depictsQid: info?.qid ?? null,
+    ownWork: Boolean(state.settings.ownWork),
   };
 }
 
+const plural = (n, word) => `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`;
+const uploadLimit = () => Math.max(1, Math.round(Number(state.settings.uploadLimit) || 5));
+const uploadDelaySec = () => Math.max(5, Math.round(Number(state.settings.uploadDelaySec) || 10));
+const pendingUploads = () => state.records.filter((r) => state.selected.has(r.key) && !onCommons(r.key));
+const missingSdc = () => state.records.filter((r) => statusFor(r.key)?.state === 'uploaded');
+
 function renderReviewIntro() {
   const n = state.selected.size;
-  const login = state.user ? '' : ' Log in first if you want the preview to include your Commons username.';
-  const own = state.settings.ownWork ? '' : ' Uploading will need the "These are my own photos" box in step 1 ticked.';
+  const busy = Boolean(state.reviewAbort);
   els.reviewIntro.textContent = n
-    ? `${n.toLocaleString()} photos selected. "Check & preview" downloads up to ${state.settings.batchSize} of them at a time, checks that Commons doesn't already have them, and shows the exact file name, description page and structured data that would be sent.${login}${own}`
-    : 'Select photos in step 2, then check them here before anything is uploaded.';
-  els.previewBtn.disabled = n === 0 || Boolean(state.previewAbort);
+    ? `${plural(n, 'photo')} selected. "Check & preview" checks up to ${state.settings.batchSize} of them at a time against Commons and shows the exact file name, description page and structured data. "Upload" sends them to Commons one at a time.`
+    : 'Select photos in step 2, then check them here before uploading.';
+  els.previewBtn.disabled = n === 0 || busy;
+
+  const count = Math.min(uploadLimit(), pendingUploads().length);
+  const canUpload = Boolean(state.user?.canUpload);
+  els.uploadBtn.disabled = busy || !canUpload || count === 0;
+  els.uploadBtn.textContent = count ? `Upload ${count} to Commons` : 'Upload to Commons';
+  let note;
+  if (!state.user) note = 'Log in with Wikimedia (top right) to upload.';
+  else if (!canUpload) note = `Commons doesn't allow ${state.user.name} to upload files yet.`;
+  else {
+    const mode = state.settings.ownWork
+      ? 'as your own work'
+      : `credited to ${creditName()} as copied from iNaturalist (Commons' license reviewers will check them)`;
+    note = `Uploads as ${state.user.name} to ${env().label}, ${mode}: up to ${uploadLimit()} photos per run, ${uploadDelaySec()} s apart. Change the pace in Settings.`;
+  }
+  els.uploadNote.textContent = note;
+
+  const missing = env().structuredData ? missingSdc().length : 0;
+  els.sdcRetryBtn.hidden = missing === 0;
+  els.sdcRetryBtn.disabled = busy || !state.user;
+  els.sdcRetryBtn.textContent = `Add missing structured data (${missing})`;
+  els.stopReviewBtn.hidden = !busy;
+}
+
+function fileLink(title) {
+  return `<a class="small" href="${escapeHtml(fileUrl(title))}" rel="noopener">${escapeHtml(title.replace(/^File:/, ''))}</a>`;
 }
 
 function statusPill(key) {
-  const s = state.status.get(key);
+  const s = statusFor(key);
   const info = state.reviewInfo.get(key);
   const pills = [];
   if (!s) pills.push('<span class="pill">Not checked yet</span>');
-  else if (s.state === 'duplicate') {
-    pills.push(`<span class="pill done">Already on Commons</span> <a class="small" href="${escapeHtml(fileUrl(s.commonsTitle))}" rel="noopener">${escapeHtml(s.commonsTitle)}</a>`);
-  } else if (s.state === 'deduped') pills.push('<span class="pill ok">Not on Commons yet</span>');
-  if (info?.nameTaken && s?.state !== 'duplicate') pills.push('<span class="pill bad">File name already used</span>');
+  else if (s.state === 'duplicate') pills.push(`<span class="pill done">Already on Commons</span> ${fileLink(s.commonsTitle)}`);
+  else if (s.state === 'deduped') pills.push('<span class="pill ok">Not on Commons yet</span>');
+  else if (s.state === 'sdc_done') pills.push(`<span class="pill ok">Uploaded</span> ${fileLink(s.commonsTitle)}`);
+  else if (s.state === 'uploaded') {
+    pills.push(`<span class="pill ok">Uploaded</span> ${fileLink(s.commonsTitle)}`);
+    if (env().structuredData) {
+      pills.push(`<span class="pill warn">Structured data missing</span>${s.sdcError ? ` <span class="small">${escapeHtml(s.sdcError)}</span>` : ''}`);
+    }
+  } else if (s.state === 'failed') pills.push(`<span class="pill bad">Not uploaded</span> <span class="small">${escapeHtml(s.error ?? '')}</span>`);
+  if (info?.nameTaken && !['duplicate', 'uploaded', 'sdc_done'].includes(s?.state)) {
+    pills.push('<span class="pill bad">File name already used</span>');
+  }
   return pills.join(' ');
 }
 
@@ -626,6 +676,7 @@ function reviewItemHtml(key) {
         <li><b>Depicts:</b> ${depicts}</li>
         <li><b>Location:</b> ${escapeHtml(locationFact(r))}</li>
         <li><b>License:</b> ${escapeHtml(license?.label ?? r.licenseCode ?? 'none')} · <a href="${escapeHtml(r.uri)}" rel="noopener">observation</a></li>
+        <li><b>Uploaded as:</b> ${state.settings.ownWork ? 'own work' : `copied from iNaturalist, credited to ${escapeHtml(creditName())}`}</li>
       </ul>
       <details class="code" data-kind="wikitext"><summary>Description page (wikitext)</summary><pre></pre></details>
       ${env().structuredData ? '<details class="code" data-kind="sdc"><summary>Structured data</summary><pre></pre></details>' : ''}
@@ -705,12 +756,11 @@ function setReviewStatus(text) {
 }
 
 async function checkAndPreview() {
-  if (state.previewAbort) return;
+  if (state.reviewAbort) return;
   const records = state.records.filter((r) => state.selected.has(r.key));
   if (!records.length) return;
   const ctrl = new AbortController();
-  state.previewAbort = ctrl;
-  els.stopPreviewBtn.hidden = false;
+  state.reviewAbort = ctrl;
   renderReviewIntro();
   try {
     await gatherInfo(records);
@@ -718,7 +768,7 @@ async function checkAndPreview() {
     renderReview();
 
     const api = commonsApi();
-    const todo = records.filter((r) => !state.status.has(r.key)).slice(0, Math.max(1, Number(state.settings.batchSize) || 25));
+    const todo = records.filter((r) => !statusFor(r.key)).slice(0, Math.max(1, Number(state.settings.batchSize) || 25));
     let checked = 0;
     let dupes = 0;
     for (const r of todo) {
@@ -729,8 +779,8 @@ async function checkAndPreview() {
       const sha1 = await sha1Hex(await res.arrayBuffer());
       const matches = await api.findBySha1(sha1);
       const status = matches.length
-        ? { key: r.key, state: 'duplicate', sha1, commonsTitle: matches[0], at: Date.now() }
-        : { key: r.key, state: 'deduped', sha1, commonsTitle: null, at: Date.now() };
+        ? { key: r.key, env: envKey(), state: 'duplicate', sha1, commonsTitle: matches[0], at: Date.now() }
+        : { key: r.key, env: envKey(), state: 'deduped', sha1, commonsTitle: null, at: Date.now() };
       state.status.set(r.key, status);
       await cache.put('status', status);
       if (status.state === 'duplicate') {
@@ -740,7 +790,7 @@ async function checkAndPreview() {
       checked++;
       updateReviewItem(r.key);
     }
-    const remaining = records.filter((r) => !state.status.has(r.key)).length;
+    const remaining = records.filter((r) => !statusFor(r.key)).length;
     let msg = `Checked ${checked} photo${checked === 1 ? '' : 's'}`;
     if (dupes) msg += `; ${dupes} already on Commons and removed from the selection`;
     msg += remaining ? `. ${remaining.toLocaleString()} still to check: press "Check & preview" again.` : '. Every selected photo has been checked.';
@@ -749,13 +799,191 @@ async function checkAndPreview() {
     setReviewStatus(e?.name === 'AbortError' ? 'Stopped.' : '');
     if (e?.name !== 'AbortError') notify(`Preview failed: ${errorMessage(e)}`, 'error');
   } finally {
-    state.previewAbort = null;
-    els.stopPreviewBtn.hidden = true;
-    saveSelection();
-    renderReviewIntro();
-    renderSummary();
-    renderGrid();
-    renderSelectionBar();
+    state.reviewAbort = null;
+    afterReviewRun();
+  }
+}
+
+function afterReviewRun() {
+  saveSelection();
+  renderReviewIntro();
+  renderSummary();
+  renderGrid();
+  renderSelectionBar();
+}
+
+// ---------- upload ----------
+async function downloadBlob(url, signal) {
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`Couldn't download the photo from iNaturalist (HTTP ${res.status})`);
+  return res.blob();
+}
+
+function uploadComment(r) {
+  const where = `iNaturalist observation ${r.obsId}, photo ${r.photoId}`;
+  return state.settings.ownWork
+    ? `Own work, also published on ${where}. Uploaded with iNat-Wikimedia`
+    : `Copied from ${where} by ${creditName()}, ${mapLicense(r.licenseCode)?.label}. Uploaded with iNat-Wikimedia`;
+}
+
+const sdcSummary = (r) => `Structured data from iNaturalist observation ${r.obsId} (iNat-Wikimedia)`;
+
+/** True when the login is missing or about to expire; tells the user what to do. */
+function loginProblem() {
+  if (!state.auth || !state.user) {
+    notify('Log in with Wikimedia first.', 'warn');
+    return true;
+  }
+  if (state.auth.expiresAt - Date.now() < 10 * 60 * 1000) {
+    logout('Your Wikimedia login is about to expire. Please log in again, then upload.');
+    return true;
+  }
+  return false;
+}
+
+async function storeStatus(key, status) {
+  const full = { ...status, key, env: envKey(), at: Date.now() };
+  delete full.uploadAttempted;
+  state.status.set(key, full);
+  await cache.put('status', full);
+  if (onCommons(key)) state.selected.delete(key);
+  updateReviewItem(key);
+  return full;
+}
+
+async function uploadSelected() {
+  if (state.reviewAbort || loginProblem()) return;
+  const todo = pendingUploads().slice(0, uploadLimit());
+  if (!todo.length) return;
+  const ctrl = new AbortController();
+  state.reviewAbort = ctrl;
+  renderReviewIntro();
+
+  const api = commonsApi({ auth: true });
+  let token = null;
+  const refreshToken = async () => {
+    token = await api.csrfToken();
+  };
+  const counts = { uploaded: 0, duplicate: 0, failed: 0, sdcMissing: 0 };
+  let stopReason = '';
+  try {
+    await gatherInfo(todo);
+    state.reviewKeys = unique([...todo.map((r) => r.key), ...state.reviewKeys.filter((k) => state.byKey.has(k))]);
+    renderReview();
+    await refreshToken();
+
+    let consecutiveFailures = 0;
+    let waitBeforeNext = false;
+    for (const [i, r] of todo.entries()) {
+      if (ctrl.signal.aborted) break;
+      if (waitBeforeNext) {
+        for (let s = uploadDelaySec(); s > 0; s--) {
+          setReviewStatus(`Waiting ${s} s before the next upload…`);
+          await sleep(1000, ctrl.signal);
+        }
+      }
+      const info = state.reviewInfo.get(r.key);
+      const onStep = (msg) => setReviewStatus(`${i + 1} of ${todo.length}: ${msg}`);
+      let result;
+      try {
+        result = await uploadPhoto({
+          rec: r,
+          filename: info.filename,
+          wikitext: renderWikitext(r, wikitextContext(info)),
+          comment: uploadComment(r),
+          sdc: env().structuredData ? buildSdc(r, sdcContext(info)) : null,
+          sdcSummary: sdcSummary(r),
+          api,
+          getToken: () => token,
+          refreshToken,
+          download: downloadBlob,
+          sha1Fn: sha1Hex,
+          signal: ctrl.signal,
+          onStep,
+        });
+      } catch (e) {
+        if (e?.name === 'AbortError') throw e;
+        if (isAuthError(e)) {
+          stopReason = `Commons stopped accepting your login (${errorMessage(e)}). Log in again to continue.`;
+          logout();
+          break;
+        }
+        result = { state: 'failed', error: errorMessage(e), uploadAttempted: true };
+      }
+      waitBeforeNext = result.uploadAttempted !== false;
+      const stored = await storeStatus(r.key, result);
+      if (stored.state === 'sdc_done') counts.uploaded++;
+      else if (stored.state === 'uploaded') { counts.uploaded++; if (env().structuredData) counts.sdcMissing++; }
+      else if (stored.state === 'duplicate') counts.duplicate++;
+      else counts.failed++;
+
+      if (result.code === 'captcha') {
+        stopReason = result.error;
+        break;
+      }
+      consecutiveFailures = stored.state === 'failed' ? consecutiveFailures + 1 : 0;
+      if (consecutiveFailures >= 3) {
+        stopReason = 'Stopped after 3 failed uploads in a row. Check the messages above before trying again.';
+        break;
+      }
+    }
+  } catch (e) {
+    if (e?.name === 'AbortError') stopReason = 'Stopped.';
+    else notify(`Upload failed: ${errorMessage(e)}`, 'error');
+  } finally {
+    state.reviewAbort = null;
+    const parts = [`Uploaded ${counts.uploaded}`];
+    if (counts.duplicate) parts.push(`${counts.duplicate} already on Commons`);
+    if (counts.failed) parts.push(`${counts.failed} not uploaded`);
+    if (counts.sdcMissing) parts.push(`${counts.sdcMissing} still need structured data`);
+    const left = pendingUploads().length;
+    setReviewStatus(`${stopReason ? `${stopReason} ` : ''}${parts.join(', ')}.${left ? ` ${plural(left, 'selected photo')} left.` : ''}`);
+    if (stopReason && stopReason !== 'Stopped.') notify(stopReason, 'warn');
+    afterReviewRun();
+  }
+}
+
+async function addMissingStructuredData() {
+  if (state.reviewAbort || loginProblem() || !env().structuredData) return;
+  const todo = missingSdc();
+  if (!todo.length) return;
+  const ctrl = new AbortController();
+  state.reviewAbort = ctrl;
+  renderReviewIntro();
+  const api = commonsApi({ auth: true });
+  let token = null;
+  const refreshToken = async () => {
+    token = await api.csrfToken();
+  };
+  let added = 0;
+  try {
+    await gatherInfo(todo);
+    state.reviewKeys = unique([...todo.map((r) => r.key), ...state.reviewKeys.filter((k) => state.byKey.has(k))]);
+    renderReview();
+    await refreshToken();
+    for (const [i, r] of todo.entries()) {
+      if (ctrl.signal.aborted) break;
+      const result = await addStructuredData({
+        status: statusFor(r.key),
+        sdc: buildSdc(r, sdcContext(state.reviewInfo.get(r.key))),
+        summary: sdcSummary(r),
+        api,
+        getToken: () => token,
+        refreshToken,
+        signal: ctrl.signal,
+        onStep: (msg) => setReviewStatus(`${i + 1} of ${todo.length}: ${msg}`),
+      });
+      const stored = await storeStatus(r.key, result);
+      if (stored.state === 'sdc_done') added++;
+    }
+    setReviewStatus(`Added structured data to ${added} of ${todo.length} files.`);
+  } catch (e) {
+    if (isAuthError(e)) logout(`Commons stopped accepting your login (${errorMessage(e)}). Log in again to continue.`);
+    else if (e?.name !== 'AbortError') notify(`Adding structured data failed: ${errorMessage(e)}`, 'error');
+    setReviewStatus(`Added structured data to ${added} files.`);
+  } finally {
+    state.reviewAbort = null;
+    afterReviewRun();
   }
 }
 
@@ -800,6 +1028,20 @@ async function openDetails(key) {
     const box = $('detailsPreview');
     if (box) box.innerHTML = `<p class="small">Couldn't prepare the preview: ${escapeHtml(errorMessage(e))}</p>`;
   }
+}
+
+// ---------- help ----------
+function openHelp(sectionId = null) {
+  const callback = oauth.redirectUriFor(location);
+  els.helpCallbackUrl.textContent = callback;
+  for (const a of document.querySelectorAll('[data-repo-link]')) a.href = CONFIG.repoUrl;
+  els.helpLoginStatus.innerHTML = clientId()
+    ? `<span class="pill ok">Set up</span> Login is set up on this site${env() !== CONFIG.environments.production ? ` (${escapeHtml(env().label)})` : ''}. If only one account can log in, Wikimedia hasn't approved the app yet.`
+    : '<span class="pill warn">Not set up</span> Nobody can log in yet. Whoever runs this site needs to do this once:';
+  if (!els.helpDialog.open) els.helpDialog.showModal();
+  const target = sectionId ? $(sectionId) : null;
+  if (target) target.scrollIntoView({ block: 'start' });
+  else els.helpDialog.scrollTop = 0;
 }
 
 // ---------- settings ----------
@@ -862,7 +1104,8 @@ function bindEvents() {
   els.ownWorkCheck.addEventListener('change', () => {
     state.settings = { ...state.settings, ownWork: els.ownWorkCheck.checked };
     writeJson('localStorage', SETTINGS_KEY, state.settings);
-    renderReviewIntro();
+    renderLoad();
+    renderReview();
   });
   els.loadBtn.addEventListener('click', () => loadObservations());
   els.reloadBtn.addEventListener('click', () => loadObservations({ reloadAll: true }));
@@ -920,7 +1163,16 @@ function bindEvents() {
   });
 
   els.previewBtn.addEventListener('click', () => checkAndPreview());
-  els.stopPreviewBtn.addEventListener('click', () => state.previewAbort?.abort());
+  els.uploadBtn.addEventListener('click', () => uploadSelected());
+  els.sdcRetryBtn.addEventListener('click', () => addMissingStructuredData());
+  // Stops between files; a file that is already being sent finishes first.
+  els.stopReviewBtn.addEventListener('click', () => state.reviewAbort?.abort());
+  window.addEventListener('beforeunload', (e) => {
+    if (state.reviewAbort) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
   els.reviewList.addEventListener('toggle', (e) => {
     const d = e.target;
     if (d.tagName !== 'DETAILS' || !d.open) return;
@@ -929,13 +1181,19 @@ function bindEvents() {
   }, true);
 
   els.settingsBtn.addEventListener('click', openSettings);
+  els.helpBtn.addEventListener('click', () => openHelp());
+  els.footerHelp.addEventListener('click', (e) => {
+    e.preventDefault();
+    openHelp();
+  });
+  els.helpClose.addEventListener('click', () => els.helpDialog.close());
   els.settingsForm.addEventListener('submit', (e) => {
     if (e.submitter?.value === 'save') saveSettings();
   });
   // Puts the defaults in the form; they take effect when the user presses Save.
   els.resetSettingsBtn.addEventListener('click', () => fillSettingsForm(defaultSettings()));
   els.detailsClose.addEventListener('click', () => els.detailsDialog.close());
-  for (const dialog of [els.detailsDialog, els.settingsDialog]) {
+  for (const dialog of [els.detailsDialog, els.settingsDialog, els.helpDialog]) {
     dialog.addEventListener('click', (e) => {
       if (e.target === dialog) dialog.close();
     });
@@ -957,13 +1215,15 @@ function bindEvents() {
 // ---------- start ----------
 async function init() {
   els = Object.fromEntries([
-    'account', 'envBadge', 'settingsBtn', 'notice', 'noticeText', 'noticeClose',
-    'accountForm', 'inatInput', 'useAccountBtn', 'ownWorkRow', 'ownWorkCheck', 'inatLine', 'loadBtn', 'reloadBtn', 'stopLoadBtn', 'loadProgress', 'loadBar', 'loadText',
+    'account', 'envBadge', 'settingsBtn', 'helpBtn', 'notice', 'noticeText', 'noticeClose',
+    'accountForm', 'inatInput', 'useAccountBtn', 'ownWorkRow', 'ownWorkCheck', 'ownWorkHint', 'inatLine',
+    'loadBtn', 'reloadBtn', 'stopLoadBtn', 'loadProgress', 'loadBar', 'loadText',
     'summary', 'searchInput', 'showSelect', 'pickBestBtn', 'selectShownBtn', 'clearBtn', 'gridCount', 'grid', 'moreBtn',
-    'reviewIntro', 'previewBtn', 'stopPreviewBtn', 'uploadBtn', 'reviewStatus', 'reviewList',
-    'selectionBar', 'selectionCount',
+    'reviewIntro', 'previewBtn', 'uploadBtn', 'sdcRetryBtn', 'stopReviewBtn', 'uploadNote', 'reviewStatus', 'reviewList',
+    'selectionBar', 'selectionCount', 'footerHelp',
     'settingsDialog', 'settingsForm', 'envSelect', 'callbackUrl', 'resetSettingsBtn',
     'detailsDialog', 'detailsTitle', 'detailsContent', 'detailsClose',
+    'helpDialog', 'helpClose', 'helpCallbackUrl', 'helpLoginStatus',
   ].map((id) => [id, $(id)]));
   bindEvents();
   restoreLogin();

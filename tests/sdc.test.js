@@ -60,6 +60,20 @@ test('credits the iNaturalist profile when the Commons username is unknown', () 
   assert.equal(creator.qualifiers.P2699[0].datavalue.value, 'https://www.inaturalist.org/people/example_naturalist');
 });
 
+test('transfer mode: source is the iNaturalist photo page, creator has no Commons username', () => {
+  const [rec] = toPhotoRecords(sampleObservation());
+  const sdc = buildSdc(rec, { ...ctx, commonsUser: 'Someone Else', ownWork: false });
+  const creator = byProp(sdc, 'P170')[0];
+  assert.equal(creator.qualifiers.P2093[0].datavalue.value, 'Alex Example');
+  assert.equal(creator.qualifiers.P4174, undefined);
+  assert.equal(creator.qualifiers.P2699[0].datavalue.value, 'https://www.inaturalist.org/people/example_naturalist');
+  const source = byProp(sdc, 'P7482')[0];
+  assert.equal(source.mainsnak.datavalue.value.id, 'Q74228490');
+  assert.equal(source.qualifiers.P973[0].datavalue.value, 'https://www.inaturalist.org/photos/987654321');
+  assert.equal(source.qualifiers.P137[0].datavalue.value.id, 'Q16958215');
+  assert.deepEqual(source['qualifiers-order'], ['P973', 'P137']);
+});
+
 test('coordinate precision follows the accuracy radius', () => {
   assert.equal(coordPrecision(1953), 0.01);
   assert.equal(coordPrecision(5), 0.00001);

@@ -11,6 +11,8 @@ import { isIsoDate } from './util.js';
 export const QIDS = {
   copyrighted: 'Q50423863',
   originalCreationByUploader: 'Q66458942',
+  fileAvailableOnInternet: 'Q74228490',
+  iNaturalist: 'Q16958215',
 };
 const GREGORIAN = 'http://www.wikidata.org/entity/Q1985727';
 const EARTH = 'http://www.wikidata.org/entity/Q2';
@@ -46,18 +48,21 @@ export function userPageUrl(commonsUser) {
 
 /**
  * @param rec photo record
- * @param ctx { authorName, authorUrl, commonsUser, depictsQid }
+ * @param ctx { authorName, authorUrl, commonsUser, depictsQid, ownWork }
+ *   ownWork false = copied from iNaturalist by someone else: the creator is credited by name and
+ *   iNaturalist profile only, and the source is "file available on the internet" at the photo page.
  * @returns { labels, claims } ready for wbeditentity's data parameter
  */
 export function buildSdc(rec, ctx) {
   const license = mapLicense(rec.licenseCode);
   if (!license) throw new Error(`License "${rec.licenseCode}" can't be uploaded to Commons`);
+  const ownWork = ctx.ownWork !== false;
   const claims = [];
 
   if (ctx.depictsQid) claims.push(statement(valueSnak('P180', itemValue(ctx.depictsQid))));
 
   const creator = { P2093: [valueSnak('P2093', stringValue(ctx.authorName))] };
-  if (ctx.commonsUser) {
+  if (ownWork && ctx.commonsUser) {
     creator.P4174 = [valueSnak('P4174', stringValue(ctx.commonsUser))];
     creator.P2699 = [valueSnak('P2699', stringValue(userPageUrl(ctx.commonsUser)))];
   } else {
@@ -67,7 +72,14 @@ export function buildSdc(rec, ctx) {
 
   claims.push(statement(valueSnak('P275', itemValue(license.qid))));
   claims.push(statement(valueSnak('P6216', itemValue(QIDS.copyrighted))));
-  claims.push(statement(valueSnak('P7482', itemValue(QIDS.originalCreationByUploader))));
+  if (ownWork) {
+    claims.push(statement(valueSnak('P7482', itemValue(QIDS.originalCreationByUploader))));
+  } else {
+    claims.push(statement(valueSnak('P7482', itemValue(QIDS.fileAvailableOnInternet)), {
+      P973: [valueSnak('P973', stringValue(`https://www.inaturalist.org/photos/${rec.photoId}`))],
+      P137: [valueSnak('P137', itemValue(QIDS.iNaturalist))],
+    }));
+  }
 
   if (isIsoDate(rec.observedOn)) {
     claims.push(statement(valueSnak('P571', {

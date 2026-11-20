@@ -43,9 +43,12 @@ export const CONFIG = {
   extraCategory: '', // e.g. "Photographs by <name>" (create it on Commons first)
   includeLicenseReview: true,
   batchSize: 25, // photos checked per "Check & preview" run
-  uploadLimit: 5, // most photos one upload run will send (upload is not built yet)
+  uploadLimit: 5, // most photos one upload run will send
   uploadDelaySec: 10,
 
+  // Source code and full guide; linked from the app's Help page.
+  repoUrl: 'https://github.com/Arun-Sunny/iNat-Wikimedia',
+
   // Sent to Wikimedia as Api-User-Agent, so Wikimedia can tell what tool is calling and where it lives.
-  userAgent: 'iNat-Wikimedia/0.1 (https://github.com/Arun-Sunny/iNat-Wikimedia)',
+  userAgent: 'iNat-Wikimedia/0.2 (https://github.com/Arun-Sunny/iNat-Wikimedia)',
 };

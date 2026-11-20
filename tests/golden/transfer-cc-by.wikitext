@@ -1,0 +1,17 @@
+=={{int:filedesc}}==
+{{Information
+ |description={{en|1=''Saxicola maurus'' (Siberian Stonechat), observed in Example Park, Example City. [https://www.inaturalist.org/observations/123456789 iNaturalist observation 123456789].}}
+ |date={{Taken on|2024-05-12}}
+ |source=[https://www.inaturalist.org/observations/123456789 iNaturalist observation 123456789], [https://www.inaturalist.org/photos/987654321 photo 987654321]
+ |author=[https://www.inaturalist.org/people/example_naturalist Alex Example]
+ |permission=
+ |other versions=
+}}
+{{Location|12.345679|76.543211|prec=1953}}
+{{iNaturalist|123456789}}
+
+=={{int:license-header}}==
+{{Cc-by-4.0|1=[https://www.inaturalist.org/people/example_naturalist Alex Example]}}
+{{iNaturalistreview}}
+
+[[Category:Saxicola maurus]]

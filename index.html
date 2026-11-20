@@ -20,6 +20,9 @@
         <span class="env-badge" id="envBadge" hidden>Test site</span>
       </div>
       <div class="account" id="account"></div>
+      <button type="button" class="icon-btn" id="helpBtn" aria-label="Help">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.4-2.7 4.1M12 17.6h.01"/></svg>
+      </button>
       <button type="button" class="icon-btn" id="settingsBtn" aria-label="Settings">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
       </button>
@@ -44,7 +47,7 @@
       <p class="muted" id="inatLine"></p>
       <label class="check-field" id="ownWorkRow" hidden>
         <input type="checkbox" id="ownWorkCheck">
-        <span>These are my own photos: I am the photographer behind this iNaturalist account. <span class="muted">Commons will list them as your own work.</span></span>
+        <span>These are my own photos: I am the photographer behind this iNaturalist account. <span class="muted" id="ownWorkHint"></span></span>
       </label>
       <div class="actions">
         <button type="button" class="btn primary" id="loadBtn">Load photos</button>
@@ -90,18 +93,25 @@
       <h2 id="reviewTitle"><span class="step">3</span> Review and upload</h2>
       <p class="muted" id="reviewIntro"></p>
       <div class="actions wrap">
-        <button type="button" class="btn primary" id="previewBtn">Check &amp; preview</button>
-        <button type="button" class="btn ghost" id="stopPreviewBtn" hidden>Stop</button>
-        <button type="button" class="btn" id="uploadBtn" disabled aria-describedby="uploadNote">Upload to Commons</button>
+        <button type="button" class="btn" id="previewBtn">Check &amp; preview</button>
+        <button type="button" class="btn primary" id="uploadBtn" disabled aria-describedby="uploadNote">Upload to Commons</button>
+        <button type="button" class="btn" id="sdcRetryBtn" hidden>Add missing structured data</button>
+        <button type="button" class="btn ghost" id="stopReviewBtn" hidden>Stop</button>
       </div>
-      <p class="muted small" id="uploadNote">Uploading isn't switched on yet. This version only shows what would be sent, so you can check it first.</p>
+      <p class="muted small" id="uploadNote"></p>
       <p class="small status-line" id="reviewStatus" aria-live="polite"></p>
       <ol class="review-list" id="reviewList"></ol>
     </section>
 
     <footer class="footer muted small">
-      Photos and data from <a href="https://www.inaturalist.org/" rel="noopener">iNaturalist</a>.
-      Uploads go to <a href="https://commons.wikimedia.org/" rel="noopener">Wikimedia Commons</a> under the photographer's own account.
+      <p>
+        <a href="#" id="footerHelp">Help and setup</a> ·
+        <a data-repo-link href="https://github.com/Arun-Sunny/iNat-Wikimedia" target="_blank" rel="noopener">Full guide and source code</a>
+      </p>
+      <p>
+        Photos and data from <a href="https://www.inaturalist.org/" rel="noopener">iNaturalist</a>.
+        Uploads go to <a href="https://commons.wikimedia.org/" rel="noopener">Wikimedia Commons</a> under your own Wikimedia account.
+      </p>
     </footer>
   </main>
 
@@ -174,6 +184,61 @@
         <button type="button" class="icon-btn small" id="detailsClose" aria-label="Close">✕</button>
       </header>
       <div id="detailsContent"></div>
+    </div>
+  </dialog>
+
+  <dialog id="helpDialog" aria-labelledby="helpTitle">
+    <div class="dialog-body help">
+      <header class="dialog-head">
+        <h2 id="helpTitle">Help</h2>
+        <button type="button" class="icon-btn small" id="helpClose" aria-label="Close">✕</button>
+      </header>
+
+      <section id="helpStart">
+        <h3>Before you start</h3>
+        <ol>
+          <li><b>A Wikimedia account.</b> <a href="https://commons.wikimedia.org/wiki/Special:CreateAccount" target="_blank" rel="noopener">Create one</a> if you don't have one; it works on all Wikimedia sites. You log in on Wikimedia's own page, so this app never sees your password.</li>
+          <li><b>An open license on iNaturalist:</b> CC0, CC BY or CC BY-SA. iNaturalist's default, CC BY-NC, isn't allowed on Commons. You can change the license of your past photos in your <a href="https://www.inaturalist.org/users/edit" target="_blank" rel="noopener">iNaturalist account settings</a>.</li>
+          <li><b>Recommended:</b> add your Commons username to your iNaturalist profile, and a link to your iNaturalist profile on your Commons user page, so reviewers can see both accounts are yours.</li>
+        </ol>
+      </section>
+
+      <section id="helpHow">
+        <h3>How to upload</h3>
+        <ol>
+          <li><b>Step 1:</b> paste the iNaturalist profile link, press <b>Use this account</b>, then <b>Load photos</b>. Tick <b>These are my own photos</b> only if you took them; otherwise they're credited to the iNaturalist photographer.</li>
+          <li><b>Step 2:</b> tap photos to select them, or press <b>Add best photo of each species</b>. Greyed-out photos can't go to Commons; their label says why.</li>
+          <li><b>Step 3:</b> press <b>Check &amp; preview</b> to see exactly what will be sent. Log in with Wikimedia (top right), then press <b>Upload</b>. Each run uploads a few photos, one at a time, with a pause between them.</li>
+          <li>Start with 2 or 3 photos and look at them on Commons before uploading more.</li>
+        </ol>
+        <p class="muted small">New Wikimedia accounts are sometimes asked for a CAPTCHA, which this app can't show. If that happens, upload one file by hand on Commons, or wait until the account is a few days old and has 10 edits.</p>
+      </section>
+
+      <section id="helpLogin">
+        <h3>Setting up the Wikimedia login (once per site)</h3>
+        <p id="helpLoginStatus"></p>
+        <ol>
+          <li>While logged in to Wikimedia, open the <a href="https://meta.wikimedia.org/wiki/Special:OAuthConsumerRegistration/propose/oauth2" target="_blank" rel="noopener">OAuth 2.0 registration form</a>.</li>
+          <li>Fill it in like this:
+            <dl class="kv">
+              <dt>Application name</dt><dd>iNat to Commons</dd>
+              <dt>Consumer version</dt><dd>1.0</dd>
+              <dt>Description</dt><dd>Lets photographers upload their own openly licensed iNaturalist photos to Wikimedia Commons.</dd>
+              <dt>"This consumer is for use only by …"</dt><dd>Unticked</dd>
+              <dt>OAuth "callback" URL</dt><dd><div class="copy-row"><code id="helpCallbackUrl"></code><button type="button" class="btn small" data-copy="#helpCallbackUrl">Copy</button></div></dd>
+              <dt>Allow consumer to specify a callback</dt><dd>Unticked</dd>
+              <dt>Client is confidential</dt><dd>Unticked</dd>
+              <dt>Types of grants</dt><dd>Request authorization for specific permissions</dd>
+              <dt>Applicable grants</dt><dd>Basic rights, Edit existing pages, Upload new files</dd>
+            </dl>
+          </li>
+          <li>Submit, then copy the <b>client application key</b>. Ignore the secret and never paste it anywhere.</li>
+          <li>Paste the key in <b>Settings → OAuth client ID</b> to use it in this browser, or put it in <code>js/config.js</code> in the code so it works for everyone.</li>
+        </ol>
+        <p class="muted small">Until Wikimedia's administrators approve the registration, only the account that registered it can log in.</p>
+      </section>
+
+      <p class="help-foot"><a data-repo-link href="https://github.com/Arun-Sunny/iNat-Wikimedia" target="_blank" rel="noopener">Full guide and source code on GitHub</a></p>
     </div>
   </dialog>
 

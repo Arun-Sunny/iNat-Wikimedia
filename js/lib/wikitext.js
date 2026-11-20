@@ -1,10 +1,14 @@
-// File description page wikitext for an upload.
+// File description page wikitext for an upload. Two modes:
 //
-// The uploader is the photographer, so the file is marked as own work under {{self}}. The
-// iNaturalist observation is linked as the place it was first published, and
-// {{iNaturalistreview}} asks Commons' review bot to confirm the license on iNaturalist. That
-// confirmation covers the case where someone questions whether the Commons account and the
-// iNaturalist account belong to the same person.
+// Own work (ctx.ownWork true, the default): the uploader is the photographer, so the file is
+// marked {{own}} under {{self}}, with the iNaturalist observation linked as where it was first
+// published. {{iNaturalistreview}} (optional) asks Commons' review bot to confirm the license on
+// iNaturalist, which settles any doubt that the two accounts belong to the same person.
+//
+// Transfer (ctx.ownWork false): someone else uploads the photographer's openly licensed photo.
+// The source is the iNaturalist observation, the author is the iNaturalist photographer, the
+// license template carries their attribution, and {{iNaturalistreview}} is always added because
+// Commons requires a license review for files copied from iNaturalist.
 import { mapLicense, selfParam } from './license.js';
 import { locationAllowed } from './plan.js';
 import { formatCoord, isIsoDate } from './util.js';
@@ -41,16 +45,24 @@ export function authorWikitext({ authorName, authorUrl, commonsUser }) {
 
 /**
  * @param rec photo record from inat.toPhotoRecords
- * @param ctx { authorName, authorUrl, commonsUser, categories: string[], includeLicenseReview }
+ * @param ctx { authorName, authorUrl, commonsUser, categories: string[], includeLicenseReview, ownWork }
  */
 export function renderWikitext(rec, ctx) {
   const license = mapLicense(rec.licenseCode);
   if (!license) throw new Error(`License "${rec.licenseCode}" can't be uploaded to Commons`);
 
+  const ownWork = ctx.ownWork !== false;
   const obsUrl = `https://www.inaturalist.org/observations/${rec.obsId}`;
   const photoUrl = `https://www.inaturalist.org/photos/${rec.photoId}`;
   const showLocation = locationAllowed(rec);
-  const author = authorWikitext(ctx);
+  const author = ownWork ? authorWikitext(ctx) : authorWikitext({ ...ctx, commonsUser: null });
+  const source = ownWork
+    ? `{{own}}<br />First published on iNaturalist: [${obsUrl} observation ${rec.obsId}], [${photoUrl} photo ${rec.photoId}]`
+    : `[${obsUrl} iNaturalist observation ${rec.obsId}], [${photoUrl} photo ${rec.photoId}]`;
+  const licenseLine = ownWork
+    ? `{{self|${selfParam(license)}|author=${author}}}`
+    : license.code === 'cc0' ? `{{${license.template}}}` : `{{${license.template}|1=${author}}}`;
+  const licenseReview = !ownWork || ctx.includeLicenseReview !== false;
 
   let description = taxonWikitext(rec);
   if (rec.commonName) description += ` (${escapeWikitext(rec.commonName)})`;
@@ -62,7 +74,7 @@ export function renderWikitext(rec, ctx) {
     '{{Information',
     ` |description={{en|1=${description}}}`,
     ` |date=${isIsoDate(rec.observedOn) ? `{{Taken on|${rec.observedOn}}}` : ''}`,
-    ` |source={{own}}<br />First published on iNaturalist: [${obsUrl} observation ${rec.obsId}], [${photoUrl} photo ${rec.photoId}]`,
+    ` |source=${source}`,
     ` |author=${author}`,
     ' |permission=',
     ' |other versions=',
@@ -73,8 +85,8 @@ export function renderWikitext(rec, ctx) {
     lines.push(`{{Location|${formatCoord(rec.lat)}|${formatCoord(rec.lng)}${prec}}}`);
   }
   lines.push(`{{iNaturalist|${rec.obsId}}}`);
-  lines.push('', '=={{int:license-header}}==', `{{self|${selfParam(license)}|author=${author}}}`);
-  if (ctx.includeLicenseReview !== false) lines.push('{{iNaturalistreview}}');
+  lines.push('', '=={{int:license-header}}==', licenseLine);
+  if (licenseReview) lines.push('{{iNaturalistreview}}');
   lines.push('');
   for (const category of ctx.categories ?? []) lines.push(`[[Category:${category}]]`);
   return `${lines.join('\n')}\n`;
