@@ -26,6 +26,15 @@ The app has a built-in **Help** page (the **?** button) with these instructions,
    - adds the structured data to the new file with `wbeditentity`. If that fails, the upload stays, and **Add missing structured data** can retry it later;
    - waits out "servers busy" (maxlag) and rate-limit replies, and stops on login problems, a CAPTCHA, or 3 failures in a row.
 
+## Projects and campaigns
+
+Uploads always go to Wikimedia Commons, the shared library behind Wikipedia, Wikispecies and the other Wikimedia projects. To file photos under a project, contest or WikiProject, open **Settings → Categories and review**:
+
+- **Project or campaign categories:** added to every photo, one per line or separated by `;`. Use the exact category the project asks for. The preview flags any that don't exist on Commons yet.
+- **Hashtag for the edit summary:** e.g. `#WLE2026`, appended to every upload's edit summary. Some campaigns use hashtags to find and count uploads.
+
+The species category is still chosen automatically. Campaigns that require a specific template on the file page aren't supported yet.
+
 ## Own work or copied from iNaturalist
 
 The **These are my own photos** box in step 1 decides how the photos are described:

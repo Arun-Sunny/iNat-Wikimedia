@@ -166,6 +166,11 @@ code, pre { font-family: ui-monospace, "Cascadia Mono", "SFMono-Regular", Menlo,
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
 .field.grow { flex: 1 1 220px; }
 .field > span { font-weight: 600; }
+textarea {
+  font: inherit; color: var(--text); background: var(--bg); resize: vertical;
+  border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; width: 100%;
+}
+textarea:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 2px; }
 input:not([type="checkbox"]), select {
   font: inherit; color: var(--text); background: var(--bg);
   border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 44px; width: 100%;

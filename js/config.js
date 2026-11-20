@@ -40,7 +40,8 @@ export const CONFIG = {
   minQuality: 'research', // research | needs_id | casual
   requireTaxon: true,
   fallbackCategory: 'Media needing categories',
-  extraCategory: '', // e.g. "Photographs by <name>" (create it on Commons first)
+  extraCategory: '', // project/campaign categories, one per line or separated by ;
+  editHashtag: '', // e.g. "#WLE2026", appended to every upload's edit summary
   includeLicenseReview: true,
   batchSize: 25, // photos checked per "Check & preview" run
   uploadLimit: 5, // most photos one upload run will send

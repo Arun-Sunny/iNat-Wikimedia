@@ -13,6 +13,7 @@ import { lookupTaxonQids } from './lib/wikidata.js';
 import { sha1Hex } from './lib/hash.js';
 import * as oauth from './lib/oauth.js';
 import * as cache from './lib/cache.js';
+import { parseCategories, normalizeHashtag } from './lib/project.js';
 import { uploadPhoto, addStructuredData, isAuthError, isPermissionError, missingGrants } from './lib/uploader.js';
 import { escapeHtml, unique, sleep } from './lib/util.js';
 
@@ -73,6 +74,7 @@ function defaultSettings() {
     requireTaxon: CONFIG.requireTaxon,
     fallbackCategory: CONFIG.fallbackCategory,
     extraCategory: CONFIG.extraCategory,
+    editHashtag: CONFIG.editHashtag || '',
     includeLicenseReview: CONFIG.includeLicenseReview,
     batchSize: CONFIG.batchSize,
     uploadLimit: CONFIG.uploadLimit,
@@ -576,7 +578,7 @@ function wikitextContext(info) {
     authorName: creditName(),
     authorUrl: creditUrl(),
     commonsUser: state.user?.name ?? null,
-    categories: [info?.category, state.settings.extraCategory].map((c) => (c || '').trim()).filter(Boolean),
+    categories: [...new Set([info?.category, ...parseCategories(state.settings.extraCategory)].filter(Boolean))],
     includeLicenseReview: state.settings.includeLicenseReview,
     ownWork: Boolean(state.settings.ownWork),
   };
@@ -670,6 +672,9 @@ function reviewItemHtml(key) {
   const category = info.category
     ? `${escapeHtml(info.category)}${info.isFallback ? ' <span class="pill warn">fallback</span>' : ''}`
     : '<span class="pill warn">none</span>';
+  const projectCats = parseCategories(state.settings.extraCategory)
+    .map((c) => `${escapeHtml(c)}${info.projectMissing?.includes(c) ? ' <span class="pill warn">not on Commons yet</span>' : ''}`)
+    .join(', ');
   return `<li class="review-item" data-key="${key}">
     <img src="${escapeHtml(r.thumbUrl)}" alt="" loading="lazy" width="72" height="72">
     <div class="ri-body">
@@ -677,6 +682,7 @@ function reviewItemHtml(key) {
       <div class="ri-status">${statusPill(key)}</div>
       <ul class="facts">
         <li><b>Category:</b> ${category}</li>
+        ${projectCats ? `<li><b>Project categories:</b> ${projectCats}</li>` : ''}
         <li><b>Depicts:</b> ${depicts}</li>
         <li><b>Location:</b> ${escapeHtml(locationFact(r))}</li>
         <li><b>License:</b> ${escapeHtml(license?.label ?? r.licenseCode ?? 'none')} · <a href="${escapeHtml(r.uri)}" rel="noopener">observation</a></li>
@@ -744,10 +750,14 @@ async function gatherInfo(records) {
   setReviewStatus('Checking file names on Commons…');
   const names = new Map(records.map((r) => [r.key, buildFilename(r)]));
   const taken = await api.pagesExist([...names.values()].map((n) => `File:${n}`));
+  const projectCats = parseCategories(state.settings.extraCategory);
+  const catExists = projectCats.length ? await api.pagesExist(projectCats.map((c) => `Category:${c}`)) : new Map();
+  const projectMissing = projectCats.filter((c) => catExists.get(`Category:${c}`) !== true);
   for (const r of records) {
     const filename = names.get(r.key);
     state.reviewInfo.set(r.key, {
       ...cats.get(r.key),
+      projectMissing,
       qid: r.taxonId != null ? qids.get(String(r.taxonId)) ?? null : null,
       filename,
       nameTaken: taken.get(`File:${filename}`) === true,
@@ -825,9 +835,11 @@ async function downloadBlob(url, signal) {
 
 function uploadComment(r) {
   const where = `iNaturalist observation ${r.obsId}, photo ${r.photoId}`;
-  return state.settings.ownWork
+  const base = state.settings.ownWork
     ? `Own work, also published on ${where}. Uploaded with iNat-Wikimedia`
     : `Copied from ${where} by ${creditName()}, ${mapLicense(r.licenseCode)?.label}. Uploaded with iNat-Wikimedia`;
+  const tag = normalizeHashtag(state.settings.editHashtag);
+  return tag ? `${base} ${tag}` : base;
 }
 
 const sdcSummary = (r) => `Structured data from iNaturalist observation ${r.obsId} (iNat-Wikimedia)`;
