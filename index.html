@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>iNat to Commons</title>
+  <meta name="description" content="Upload your own iNaturalist photos to Wikimedia Commons, with species, location and license filled in.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#1f6f4a">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231f6f4a'/%3E%3Cpath d='M9 23c0-8 5-13 14-14-1 9-6 14-14 14zm0 0l7-7' stroke='%23fff' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8"/><path d="M9 23c0-8 5-13 14-14-1 9-6 14-14 14zm0 0l7-7"/></svg>
+        <span class="brand-text">iNat <span class="arrow" aria-hidden="true">→</span><span class="sr-only">to</span> Commons</span>
+        <span class="env-badge" id="envBadge" hidden>Test site</span>
+      </div>
+      <div class="account" id="account"></div>
+      <button type="button" class="icon-btn" id="settingsBtn" aria-label="Settings">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="notice" id="notice" role="status" aria-live="polite" hidden>
+      <p id="noticeText"></p>
+      <button type="button" class="icon-btn small" id="noticeClose" aria-label="Dismiss">✕</button>
+    </div>
+
+    <section class="card" id="loadCard" aria-labelledby="loadTitle">
+      <h2 id="loadTitle"><span class="step">1</span> Load photos from iNaturalist</h2>
+      <form class="account-form" id="accountForm" novalidate>
+        <label class="field grow">
+          <span>Your iNaturalist profile link or username</span>
+          <input id="inatInput" name="inat" placeholder="https://www.inaturalist.org/people/yourname" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="url">
+        </label>
+        <button type="submit" class="btn" id="useAccountBtn">Use this account</button>
+      </form>
+      <p class="muted" id="inatLine"></p>
+      <label class="check-field" id="ownWorkRow" hidden>
+        <input type="checkbox" id="ownWorkCheck">
+        <span>These are my own photos: I am the photographer behind this iNaturalist account. <span class="muted">Commons will list them as your own work.</span></span>
+      </label>
+      <div class="actions">
+        <button type="button" class="btn primary" id="loadBtn">Load photos</button>
+        <button type="button" class="btn" id="reloadBtn" hidden>Reload everything</button>
+        <button type="button" class="btn ghost" id="stopLoadBtn" hidden>Stop</button>
+      </div>
+      <div class="progress" id="loadProgress" hidden>
+        <div class="bar"><span id="loadBar"></span></div>
+        <p class="muted small" id="loadText"></p>
+      </div>
+    </section>
+
+    <section class="card" id="chooseCard" aria-labelledby="chooseTitle">
+      <h2 id="chooseTitle"><span class="step">2</span> Choose photos</h2>
+      <div class="summary" id="summary"></div>
+      <div class="toolbar">
+        <label class="field grow">
+          <span class="sr-only">Search species</span>
+          <input type="search" id="searchInput" placeholder="Search species or common name" autocomplete="off">
+        </label>
+        <label class="field">
+          <span class="sr-only">Show</span>
+          <select id="showSelect">
+            <option value="eligible">Can upload</option>
+            <option value="selected">Selected</option>
+            <option value="oncommons">Already on Commons</option>
+            <option value="skipped">Can't upload</option>
+            <option value="all">All photos</option>
+          </select>
+        </label>
+      </div>
+      <div class="actions wrap">
+        <button type="button" class="btn" id="pickBestBtn">Add best photo of each species</button>
+        <button type="button" class="btn" id="selectShownBtn">Select all shown</button>
+        <button type="button" class="btn ghost" id="clearBtn">Clear selection</button>
+      </div>
+      <p class="muted small" id="gridCount"></p>
+      <ul class="grid" id="grid" aria-label="Photos"></ul>
+      <div class="center"><button type="button" class="btn" id="moreBtn" hidden>Show more</button></div>
+    </section>
+
+    <section class="card" id="reviewCard" aria-labelledby="reviewTitle">
+      <h2 id="reviewTitle"><span class="step">3</span> Review and upload</h2>
+      <p class="muted" id="reviewIntro"></p>
+      <div class="actions wrap">
+        <button type="button" class="btn primary" id="previewBtn">Check &amp; preview</button>
+        <button type="button" class="btn ghost" id="stopPreviewBtn" hidden>Stop</button>
+        <button type="button" class="btn" id="uploadBtn" disabled aria-describedby="uploadNote">Upload to Commons</button>
+      </div>
+      <p class="muted small" id="uploadNote">Uploading isn't switched on yet. This version only shows what would be sent, so you can check it first.</p>
+      <p class="small status-line" id="reviewStatus" aria-live="polite"></p>
+      <ol class="review-list" id="reviewList"></ol>
+    </section>
+
+    <footer class="footer muted small">
+      Photos and data from <a href="https://www.inaturalist.org/" rel="noopener">iNaturalist</a>.
+      Uploads go to <a href="https://commons.wikimedia.org/" rel="noopener">Wikimedia Commons</a> under the photographer's own account.
+    </footer>
+  </main>
+
+  <div class="selection-bar" id="selectionBar" hidden>
+    <span id="selectionCount"></span>
+    <a class="btn primary small" href="#reviewCard">Review</a>
+  </div>
+
+  <dialog id="settingsDialog" aria-labelledby="settingsTitle">
+    <form method="dialog" id="settingsForm" class="dialog-body">
+      <header class="dialog-head">
+        <h2 id="settingsTitle">Settings</h2>
+        <button type="submit" value="cancel" formnovalidate class="icon-btn small" aria-label="Close">✕</button>
+      </header>
+
+      <fieldset>
+        <legend>Where to upload</legend>
+        <label class="field"><span>Site</span><select name="env" id="envSelect"></select></label>
+        <label class="field"><span>OAuth client ID <em class="muted">(leave empty to use the one in config.js)</em></span><input name="clientIdOverride" autocomplete="off" spellcheck="false"></label>
+        <div class="field">
+          <span>Callback URL to register</span>
+          <div class="copy-row"><code id="callbackUrl"></code><button type="button" class="btn small" data-copy="#callbackUrl">Copy</button></div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Credit</legend>
+        <p class="muted small">Leave these empty to use the name and profile link from iNaturalist.</p>
+        <label class="field"><span>Photographer's name</span><input name="authorName" autocomplete="off"></label>
+        <label class="field"><span>Photographer's profile link</span><input name="authorUrl" type="url" autocomplete="off"></label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Which photos</legend>
+        <label class="field"><span>Minimum quality grade</span>
+          <select name="minQuality">
+            <option value="research">Research Grade only</option>
+            <option value="needs_id">Research Grade and Needs ID</option>
+            <option value="casual">Everything, including Casual</option>
+          </select>
+        </label>
+        <label class="check-field"><input type="checkbox" name="requireTaxon"> Skip observations with no species identified</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Categories and review</legend>
+        <label class="field"><span>Category when the species has none on Commons</span><input name="fallbackCategory"></label>
+        <label class="field"><span>Extra category for every photo <em class="muted">(optional)</em></span><input name="extraCategory" placeholder="e.g. Photographs by your name"></label>
+        <label class="check-field"><input type="checkbox" name="includeLicenseReview"> Ask Commons to confirm the license on iNaturalist ({{iNaturalistreview}})</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Pace</legend>
+        <label class="field"><span>Photos checked per preview run</span><input name="batchSize" type="number" min="1" max="200"></label>
+        <label class="field"><span>Most photos per upload run</span><input name="uploadLimit" type="number" min="1" max="500"></label>
+        <label class="field"><span>Seconds between uploads</span><input name="uploadDelaySec" type="number" min="5" max="600"></label>
+      </fieldset>
+
+      <footer class="dialog-foot">
+        <button type="button" class="btn ghost" id="resetSettingsBtn">Reset to defaults</button>
+        <button type="submit" value="save" class="btn primary">Save</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="detailsDialog" aria-labelledby="detailsTitle">
+    <div class="dialog-body">
+      <header class="dialog-head">
+        <h2 id="detailsTitle">Photo</h2>
+        <button type="button" class="icon-btn small" id="detailsClose" aria-label="Close">✕</button>
+      </header>
+      <div id="detailsContent"></div>
+    </div>
+  </dialog>
+
+  <noscript><p class="container">This app needs JavaScript.</p></noscript>
+</body>
+</html>

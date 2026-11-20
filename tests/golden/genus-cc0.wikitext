@@ -1,0 +1,15 @@
+=={{int:filedesc}}==
+{{Information
+ |description={{en|1=''Saxicola''. [https://www.inaturalist.org/observations/123456789 iNaturalist observation 123456789].}}
+ |date=
+ |source={{own}}<br />First published on iNaturalist: [https://www.inaturalist.org/observations/123456789 observation 123456789], [https://www.inaturalist.org/photos/987654321 photo 987654321]
+ |author=[https://www.inaturalist.org/people/example_naturalist Alex Example] ([[User:Alex Example|Alex Example]])
+ |permission=
+ |other versions=
+}}
+{{iNaturalist|123456789}}
+
+=={{int:license-header}}==
+{{self|cc-zero|author=[https://www.inaturalist.org/people/example_naturalist Alex Example] ([[User:Alex Example|Alex Example]])}}
+
+[[Category:Saxicola]]
