@@ -13,7 +13,7 @@ import { lookupTaxonQids } from './lib/wikidata.js';
 import { sha1Hex } from './lib/hash.js';
 import * as oauth from './lib/oauth.js';
 import * as cache from './lib/cache.js';
-import { uploadPhoto, addStructuredData, isAuthError } from './lib/uploader.js';
+import { uploadPhoto, addStructuredData, isAuthError, isPermissionError, missingGrants } from './lib/uploader.js';
 import { escapeHtml, unique, sleep } from './lib/util.js';
 
 const PAGE_SIZE = 60;
@@ -243,6 +243,11 @@ function logout(message) {
   if (message) notify(message, 'warn');
 }
 
+function missingGrantsMessage(missing) {
+  return `You're logged in, but this site's Wikimedia login doesn't include these permissions: ${missing.join(', ')}. `
+    + 'Whoever set up the login needs to register a new version with them; see Help → "Setting up the Wikimedia login".';
+}
+
 async function loadUser() {
   if (!state.auth) return;
   renderAccount();
@@ -252,10 +257,9 @@ async function loadUser() {
       logout('Commons did not accept the login. Please log in again.');
       return;
     }
-    state.user = { name: info.name, canUpload: (info.rights ?? []).includes('upload') };
-    if (!state.user.canUpload) {
-      notify(`${info.name} is logged in, but Commons doesn't allow this account to upload yet.`, 'warn');
-    }
+    const missing = missingGrants(info.rights ?? []);
+    state.user = { name: info.name, missing, canUpload: missing.length === 0 };
+    if (missing.length) notify(missingGrantsMessage(missing), 'warn');
   } catch (e) {
     logout(`Couldn't confirm your Commons login (${errorMessage(e)}). Please log in again.`);
     return;
@@ -608,7 +612,7 @@ function renderReviewIntro() {
   els.uploadBtn.textContent = count ? `Upload ${count} to Commons` : 'Upload to Commons';
   let note;
   if (!state.user) note = 'Log in with Wikimedia (top right) to upload.';
-  else if (!canUpload) note = `Commons doesn't allow ${state.user.name} to upload files yet.`;
+  else if (!canUpload) note = missingGrantsMessage(state.user.missing ?? []);
   else {
     const mode = state.settings.ownWork
       ? 'as your own work'
@@ -906,6 +910,14 @@ async function uploadSelected() {
         if (isAuthError(e)) {
           stopReason = `Commons stopped accepting your login (${errorMessage(e)}). Log in again to continue.`;
           logout();
+          break;
+        }
+        if (isPermissionError(e)) {
+          await storeStatus(r.key, { state: 'failed', error: errorMessage(e) });
+          counts.failed++;
+          stopReason = e.code === 'cantcreate'
+            ? `Commons refused: "${errorMessage(e)}" This site's Wikimedia login is missing the "Create, edit, and move pages" permission; see Help → "Setting up the Wikimedia login".`
+            : `Commons refused: "${errorMessage(e)}" Stopped; the remaining photos would fail the same way.`;
           break;
         }
         result = { state: 'failed', error: errorMessage(e), uploadAttempted: true };

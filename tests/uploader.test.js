@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { interpretUpload, withRetries, uploadPhoto, addStructuredData, isAuthError } from '../js/lib/uploader.js';
+import { interpretUpload, withRetries, uploadPhoto, addStructuredData, isAuthError, isPermissionError, missingGrants } from '../js/lib/uploader.js';
 import { CommonsError } from '../js/lib/commons.js';
 
 const noSleep = async () => {};
@@ -70,12 +70,31 @@ test('retries network failures and stops after the attempt limit', async () => {
   assert.equal(calls, 3);
 });
 
-test('recognises login and permission errors', () => {
+test('tells login problems apart from missing permissions', () => {
   assert.equal(isAuthError(new CommonsError({ code: 'assertuserfailed' })), true);
   assert.equal(isAuthError(new CommonsError({ code: 'mwoauth-invalid-authorization' })), true);
-  assert.equal(isAuthError(new CommonsError({ code: 'permissiondenied' })), true);
+  assert.equal(isAuthError(new CommonsError({ code: 'cantcreate' })), false);
   assert.equal(isAuthError(new CommonsError({ code: 'maxlag' })), false);
   assert.equal(isAuthError(new Error('x')), false);
+
+  // "You do not have permission to create new pages." arrives as code cantcreate.
+  assert.equal(isPermissionError(new CommonsError({ code: 'cantcreate', info: 'You do not have permission to create new pages.' })), true);
+  assert.equal(isPermissionError(new CommonsError({ code: 'permissiondenied' })), true);
+  assert.equal(isPermissionError(new CommonsError({ code: 'badaccess-groups' })), true);
+  assert.equal(isPermissionError(new CommonsError({ code: 'readonly' })), true);
+  assert.equal(isPermissionError(new CommonsError({ code: 'maxlag' })), false);
+});
+
+test('lists the OAuth grants a login is missing', () => {
+  assert.deepEqual(missingGrants(['upload', 'createpage', 'edit', 'read']), []);
+  // The case that hit us: upload and edit granted, but not page creation.
+  assert.deepEqual(missingGrants(['upload', 'edit', 'read']), ['Create, edit, and move pages']);
+  assert.deepEqual(missingGrants([]), ['Upload new files', 'Create, edit, and move pages', 'Edit existing pages']);
+});
+
+test('a missing permission during upload is thrown so the run stops', async () => {
+  const api = fakeApi({ uploads: [new CommonsError({ code: 'cantcreate', info: 'You do not have permission to create new pages.' })] });
+  await assert.rejects(uploadPhoto(baseArgs(api)), (e) => isPermissionError(e) && e.code === 'cantcreate');
 });
 
 // ---------- uploadPhoto with a fake Commons ----------

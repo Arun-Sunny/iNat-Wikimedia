@@ -229,13 +229,14 @@
               <dt>Allow consumer to specify a callback</dt><dd>Unticked</dd>
               <dt>Client is confidential</dt><dd>Unticked</dd>
               <dt>Types of grants</dt><dd>Request authorization for specific permissions</dd>
-              <dt>Applicable grants</dt><dd>Basic rights, Edit existing pages, Upload new files</dd>
+              <dt>Applicable grants</dt><dd>Basic rights, Edit existing pages, Create, edit, and move pages, Upload new files <span class="muted">(all four are needed: uploading a new file also creates its page)</span></dd>
             </dl>
           </li>
           <li>Submit, then copy the <b>client application key</b>. Ignore the secret and never paste it anywhere.</li>
           <li>Paste the key in <b>Settings → OAuth client ID</b> to use it in this browser, or put it in <code>js/config.js</code> in the code so it works for everyone.</li>
         </ol>
         <p class="muted small">Until Wikimedia's administrators approve the registration, only the account that registered it can log in.</p>
+        <p class="muted small"><b>Missed a permission?</b> Permissions can't be changed after registering. Register again with the same name and a higher version (e.g. 1.1) and all four permissions, paste the new key, then log out and log in again.</p>
       </section>
 
       <p class="help-foot"><a data-repo-link href="https://github.com/Arun-Sunny/iNat-Wikimedia" target="_blank" rel="noopener">Full guide and source code on GitHub</a></p>

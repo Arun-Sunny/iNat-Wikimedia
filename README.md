@@ -97,9 +97,12 @@ The login is an OAuth 2.0 "consumer" registered once for the whole site. Every u
    | Allow consumer to specify a callback | unchecked |
    | Client is confidential | **unchecked** (it's a browser app; it uses PKCE instead of a secret) |
    | Types of grants | "Request authorization for specific permissions" |
-   | Applicable grants | **Basic rights**, **Edit existing pages** (needed for structured data), **Upload new files** |
+   | Applicable grants | **Basic rights**, **Edit existing pages**, **Create, edit, and move pages**, **Upload new files**. All four are needed: uploading a new file also creates its description page, which needs the "create pages" right. Without it, Commons answers "You do not have permission to create new pages." |
 3. Accept the terms and submit.
 4. Wikimedia shows a **client application key** and a **client application secret**. Copy the **key** only. The app never needs the secret: don't put it anywhere, and don't share it.
+   After logging in, the app checks the permissions the login actually has, and disables uploading with a clear message if any are missing.
+
+   Permissions can't be changed after registering. If one is missing, register again with the same name and a higher version (e.g. `1.1`), use the new key, and log out and in again.
 5. Put the key in `clientId` under `environments.production` in [js/config.js](js/config.js), then commit and push. The client key is not secret, so it's fine in a public repository. To try it without committing, paste it in the app's Settings instead; that only saves it in that browser.
 
 ### Testing on the beta cluster (optional)

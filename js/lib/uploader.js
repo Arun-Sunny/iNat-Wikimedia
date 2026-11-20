@@ -3,11 +3,36 @@
 import { CommonsError } from './commons.js';
 import { sleep } from './util.js';
 
-const AUTH_ERRORS = /^(assertuserfailed|assertnameduserfailed|notloggedin|mwoauth-|badaccess|permissiondenied|readonly)/;
+const AUTH_ERRORS = /^(assertuserfailed|assertnameduserfailed|notloggedin|mwoauth-)/;
+const PERMISSION_ERRORS = /^(cantcreate|permissiondenied|badaccess|cantedit|noedit|protectedpage|cascadeprotected|readonly)/;
 
-/** Errors after which continuing with the next photo is pointless: login or permission problems. */
+/** The login itself is no longer valid: log in again. */
 export function isAuthError(e) {
   return e instanceof CommonsError && AUTH_ERRORS.test(e.code);
+}
+
+/**
+ * The login works but isn't allowed to do this (e.g. the OAuth registration lacks a grant, or
+ * the wiki is read-only). Every following photo would fail the same way, so the run stops.
+ */
+export function isPermissionError(e) {
+  return e instanceof CommonsError && PERMISSION_ERRORS.test(e.code);
+}
+
+/**
+ * Rights the app needs, with the OAuth grant that provides each. With an OAuth login, the
+ * "rights" Commons reports are already limited to what the registration's grants allow.
+ * Creating the file page of a new upload needs createpage as well as upload and edit.
+ */
+export const REQUIRED_RIGHTS = {
+  upload: 'Upload new files',
+  createpage: 'Create, edit, and move pages',
+  edit: 'Edit existing pages',
+};
+
+export function missingGrants(rights = []) {
+  const have = new Set(rights);
+  return Object.entries(REQUIRED_RIGHTS).filter(([right]) => !have.has(right)).map(([, grant]) => grant);
 }
 
 export function isCaptchaError(e) {
